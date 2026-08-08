@@ -129,22 +129,31 @@ class InferenceResult:
             "geoinference: Inference Result",
             "=" * 60,
             f"Design: {self.design_name}",
-            f"Observations: {self.n_obs} ({self.diagnostics.n_positive_frames} with h>0, "
-            f"{self.diagnostics.n_empty_frames} empty)",
+            (
+                f"Observations: {self.n_obs} "
+                f"({self.diagnostics.n_positive_frames} with h>0, "
+                f"{self.diagnostics.n_empty_frames} empty)"
+            ),
             f"Clusters: {self.n_clusters}",
             "",
             "── Ratio estimand (people-weighted) ──",
             f"  Estimate:  {self.ratio:.4f}",
             f"  SE:        {self.ratio_se.recommended:.4f}  ({self.ratio_se.method_used})",
-            f"  95% CI:    [{self.ratio_ci.recommended[0]:.4f}, "
-            f"{self.ratio_ci.recommended[1]:.4f}]",
+            (
+                f"  95% CI:    [{self.ratio_ci.recommended[0]:.4f}, "
+                f"{self.ratio_ci.recommended[1]:.4f}]"
+            ),
             "",
             "── Photo-level mean (location-weighted) ──",
             f"  Estimate:  {self.photo_mean:.4f}",
-            f"  SE:        {self.photo_mean_se.recommended:.4f}  "
-            f"({self.photo_mean_se.method_used})",
-            f"  95% CI:    [{self.photo_mean_ci.recommended[0]:.4f}, "
-            f"{self.photo_mean_ci.recommended[1]:.4f}]",
+            (
+                f"  SE:        {self.photo_mean_se.recommended:.4f}  "
+                f"({self.photo_mean_se.method_used})"
+            ),
+            (
+                f"  95% CI:    [{self.photo_mean_ci.recommended[0]:.4f}, "
+                f"{self.photo_mean_ci.recommended[1]:.4f}]"
+            ),
             "",
             "── Diagnostics ──",
             f"  ICC:                {self.diagnostics.icc:.4f}",
