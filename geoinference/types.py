@@ -14,13 +14,20 @@ import numpy as np
 class SEResult:
     """Standard error estimates from multiple methods.
 
-    The ``recommended`` field holds the SE the design selects as primary.
-    The others are reported for comparison and as robustness checks.
+    The same three methods are reported for every estimand, so a field means the
+    same thing wherever you find it. ``recommended`` holds the one the design
+    selects, or the one ``se_method`` asked for.
+
+    There is deliberately no ``wild`` field. The wild cluster bootstrap is a
+    percentile-t procedure: it bootstraps the *t statistic* to get an interval
+    and studentises by the analytic cluster-robust SE, so it produces no standard
+    error of its own. Putting one here would mean repeating ``cluster`` under a
+    second name. It appears in :class:`CIResult` instead, where it belongs.
     """
 
     naive: float
     cluster: float
-    bootstrap: float | None
+    bootstrap: float | None  # pairs cluster bootstrap: sd of the resampled estimates
     recommended: float
     method_used: str  # "naive", "cluster", "bootstrap"
 
@@ -36,7 +43,8 @@ class CIResult:
 
     normal: tuple[float, float]  # est ± z * se_recommended
     t: tuple[float, float]  # est ± t_{G-1} * se_recommended
-    bootstrap: tuple[float, float] | None  # percentile CI
+    bootstrap: tuple[float, float] | None  # pairs cluster bootstrap, percentile
+    wild: tuple[float, float] | None  # wild cluster bootstrap, percentile-t
     recommended: tuple[float, float]
     level: float  # e.g. 0.95
 
@@ -58,6 +66,12 @@ class Diagnostics:
     icc: float
     deff: float
     n_eff: float
+
+    # Kish effective number of itineraries, (sum n_c)^2 / sum n_c^2. Equal to
+    # n_clusters when every itinerary is the same size, and far below it when a
+    # few dominate. This is the number that predicts whether *any* interval here
+    # can be trusted -- see `estimate`'s warning and the table in its docstring.
+    n_clusters_eff: float
 
     se_ratio_cluster_to_naive: float  # for the photo-mean
 

@@ -24,7 +24,12 @@ import argparse
 import pandas as pd
 
 from .designs import PointDesign
-from .inference import estimate
+from .inference import (
+    DEFAULT_MAX_DEPENDENCE_POINTS,
+    DEFAULT_T_INTERVAL_BELOW_CLUSTERS,
+    DEFAULT_WARN_ABOVE_CLUSTER_SIZE_CV,
+    estimate,
+)
 from .types import InferenceResult
 
 
@@ -41,6 +46,9 @@ def estimate_from_csv(
     bootstrap: bool = True,
     bootstrap_reps: int = 2000,
     seed: int = 42,
+    warn_above_cluster_size_cv: float | None = DEFAULT_WARN_ABOVE_CLUSTER_SIZE_CV,
+    t_interval_below_clusters: int = DEFAULT_T_INTERVAL_BELOW_CLUSTERS,
+    max_dependence_points: int = DEFAULT_MAX_DEPENDENCE_POINTS,
 ) -> InferenceResult:
     """Estimate the population ratio from an annotated-frames CSV.
 
@@ -82,6 +90,9 @@ def estimate_from_csv(
         lon_var=_present(lon_var),
         lat_var=_present(lat_var),
         time_var=_present(time_var),
+        warn_above_cluster_size_cv=warn_above_cluster_size_cv,
+        t_interval_below_clusters=t_interval_below_clusters,
+        max_dependence_points=max_dependence_points,
     )
 
 

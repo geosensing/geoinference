@@ -7,6 +7,7 @@ that verify the SEs are accurate and CIs achieve nominal coverage.
 
 import functools
 import unittest
+import warnings
 
 import numpy as np
 import pandas as pd
@@ -20,6 +21,7 @@ from simcheck import (
 )
 
 from geoinference import InferenceResult, PointDesign, WalkDesign, estimate
+from geoinference.inference import _cluster_bootstrap, _ratio_estimator
 
 
 def _make_test_data(
@@ -332,6 +334,7 @@ class TestCoverageSimulation(unittest.TestCase):
         reps: int | None = None,
         seed: int = 0,
         bootstrap: bool = False,
+        bootstrap_reps: int = 299,
     ) -> MonteCarloResult:
         """Run a Monte Carlo study and package it for the simcheck gates.
 
@@ -346,6 +349,8 @@ class TestCoverageSimulation(unittest.TestCase):
             reps: Replicate count; defaults to the current simcheck tier.
             seed: Seed for the sequence of dataset seeds.
             bootstrap: Whether to ask ``estimate`` for bootstrap intervals.
+            bootstrap_reps: Bootstrap replications, kept small so a coverage
+                study over many datasets stays affordable.
 
         Returns:
             MonteCarloResult: Estimates, standard errors and coverage flags.
@@ -362,6 +367,7 @@ class TestCoverageSimulation(unittest.TestCase):
                 "n_people",
                 design=design_fn(),
                 bootstrap=bootstrap,
+                bootstrap_reps=bootstrap_reps,
             )
             point = getattr(result, estimand)
             if np.isnan(point):
@@ -509,6 +515,337 @@ class TestCoverageSimulation(unittest.TestCase):
             low,
             "clustering below the level of the correlation should under-cover; "
             f"measured {study.coverage:.3f}",
+        )
+
+    # ------------------------------------------------------------------
+    # Which bootstrap `estimate` hands out
+    # ------------------------------------------------------------------
+
+    def test_the_bootstrap_interval_covers_with_few_itineraries(self):
+        """``se_method="bootstrap"`` must not be the worst option on offer.
+
+        It was. ``estimate`` filled ``ratio_ci.bootstrap`` from the *pairs*
+        cluster bootstrap, which resamples G itineraries with replacement from G
+        -- about 63% of them appear in a given draw -- and then takes raw
+        percentiles rather than studentizing. Measured coverage of a nominal 95%
+        interval, balanced itineraries at ICC 0.31 over 400 replicates:
+
+            G      5      8     12     20     40
+            pairs  0.815  0.887 0.920  0.932  0.932
+            wild   0.932  0.953 0.940  0.955  0.943
+
+        Five itineraries of twenty frames, matching
+        ``test_the_pairs_bootstrap_is_caught_under_covering`` so the two describe
+        the same design. There the pairs bootstrap measures 0.818; here the wild
+        one measures 0.955.
+        """
+        study = self._study(
+            lambda: PointDesign(sampling="srs", cluster_var="itinerary_id"),
+            functools.partial(_make_clustered_data, n=100, g=5),
+            ci_attr="wild",
+            bootstrap=True,
+        )
+        assert_unbiased(study, label="ratio, bootstrap interval, G=5")
+        assert_coverage(study, 0.95, label="ratio, bootstrap interval, G=5")
+
+    def test_the_pairs_bootstrap_is_caught_under_covering(self):
+        """The reason the swap above is not a matter of taste.
+
+        Runs the interval `estimate` used to hand out through the same gate the
+        new one passes, and requires it to fail. If this stops failing, either
+        the fixture stopped being clustered or the gate stopped measuring
+        coverage, and the choice of bootstrap is no longer evidence-backed.
+
+        This is the one test here that does not take its replicate count from the
+        simcheck tier, and the reason is power rather than preference. The pairs
+        bootstrap's true coverage on this design is about 0.818; at the fast
+        tier's 100 replicates the 3-sigma floor is 0.885, only about 1.6 standard
+        errors away, so the gate would pass or fail on the seed -- it did exactly
+        that during development, landing on 0.890. Four hundred replicates put
+        the floor at 0.917, a ten-point margin the sampling noise cannot cross.
+        """
+        reps = 400
+        rng = np.random.default_rng(11)
+        covered = []
+        for _ in range(reps):
+            frame = _make_clustered_data(n=100, g=5, seed=int(rng.integers(2**31)))
+            _, low, high = _cluster_bootstrap(
+                frame["n_women"].to_numpy(dtype=float),
+                frame["n_people"].to_numpy(dtype=float),
+                frame["itinerary_id"].to_numpy(),
+                _ratio_estimator,
+                reps=299,
+                rng=np.random.default_rng(int(rng.integers(2**31))),
+            )
+            if not np.isnan(low):
+                covered.append(low <= self.TRUE_P <= high)
+
+        rate = float(np.mean(covered))
+        band_low, _ = binomial_band(0.95, len(covered))
+        self.assertLess(
+            rate,
+            band_low,
+            "the pairs bootstrap should under-cover at G=5, which is why "
+            f"estimate() no longer uses it for the ratio; measured {rate:.3f}",
+        )
+
+
+class TestMethodMenuIsConsistent(unittest.TestCase):
+    """The same methods are offered, and mean the same thing, for both estimands.
+
+    An interface property rather than a statistical one, and worth a test because
+    it was briefly untrue: the ratio was given the wild cluster bootstrap while
+    the photo mean kept the pairs bootstrap, so ``ci.bootstrap`` was a
+    percentile-t for one estimand and a raw percentile for the other, and
+    ``se.bootstrap`` was populated for one and None for the other. Anyone
+    comparing the two would have been comparing different procedures under one
+    name.
+    """
+
+    def setUp(self):
+        self.frame = _make_clustered_data(g=10)
+        self.design = PointDesign(sampling="srs", cluster_var="itinerary_id")
+        self.result = estimate(self.frame, design=self.design, bootstrap=True, bootstrap_reps=199)
+
+    def test_both_estimands_report_every_standard_error(self):
+        """Three standard errors each, none missing."""
+        for label, se in (
+            ("ratio", self.result.ratio_se),
+            ("photo_mean", self.result.photo_mean_se),
+        ):
+            for field in ("naive", "cluster", "bootstrap"):
+                value = getattr(se, field)
+                self.assertIsNotNone(value, f"{label}_se.{field} is None")
+                self.assertGreater(value, 0.0, f"{label}_se.{field} is not positive")
+
+    def test_both_estimands_report_every_interval(self):
+        """Four intervals each, none missing, each properly ordered."""
+        for label, ci in (
+            ("ratio", self.result.ratio_ci),
+            ("photo_mean", self.result.photo_mean_ci),
+        ):
+            for field in ("normal", "t", "bootstrap", "wild"):
+                interval = getattr(ci, field)
+                self.assertIsNotNone(interval, f"{label}_ci.{field} is None")
+                low, high = interval
+                self.assertLess(low, high, f"{label}_ci.{field} is not ordered")
+
+    def test_the_wild_interval_is_its_own_procedure_for_both(self):
+        """Percentile-t and raw percentile should not land on the same numbers."""
+        for label, ci in (
+            ("ratio", self.result.ratio_ci),
+            ("photo_mean", self.result.photo_mean_ci),
+        ):
+            self.assertNotEqual(
+                ci.wild, ci.bootstrap, f"{label}: wild and pairs intervals coincide"
+            )
+
+    def test_the_caller_can_name_the_interval(self):
+        """``ci_method`` selects, rather than the package deciding for you."""
+        for method in ("normal", "t", "bootstrap", "wild"):
+            result = estimate(
+                self.frame,
+                design=self.design,
+                bootstrap=True,
+                bootstrap_reps=199,
+                ci_method=method,
+            )
+            for label, ci in (
+                ("ratio", result.ratio_ci),
+                ("photo_mean", result.photo_mean_ci),
+            ):
+                self.assertEqual(
+                    ci.recommended,
+                    getattr(ci, method),
+                    f"{label}: ci_method={method!r} did not select that interval",
+                )
+
+    def test_the_wild_interval_centres_on_each_cluster_own_normalizer(self):
+        """A bug that is invisible on balanced data, so it needs uneven data.
+
+        The percentile-t denominator uses the scores at the *bootstrap* estimate,
+        which is the observed one shifted by delta. Cluster c's score moves by
+        delta times its own normalizer. Subtracting the mean instead --
+        ``drawn - drawn.mean()`` -- takes ``delta * normalizer / G`` off every
+        cluster, which is the same number only when every cluster is the same
+        size. Coverage at nominal 0.95 over 400 replicates was 0.948 / 0.927 /
+        0.897 / 0.890 under mean-centering as the size CV rose through
+        0 / 0.6 / 1.0 / 1.5, against 0.948 / 0.940 / 0.915 / 0.927 with this.
+
+        Rather than re-run a coverage study here, this checks the algebra that
+        makes the difference: on equal-sized clusters the two centerings agree,
+        and on unequal ones they do not. A regression to mean-centering would
+        make the second assertion fail.
+        """
+        equal = np.full(6, 20.0)
+        uneven = np.array([100.0, 8.0, 8.0, 8.0, 8.0, 8.0])
+        delta = 0.01
+
+        for label, normalizers in (("equal", equal), ("uneven", uneven)):
+            per_cluster = delta * normalizers
+            mean_centred = np.full(6, delta * normalizers.sum() / 6)
+            same = np.allclose(per_cluster, mean_centred)
+            if label == "equal":
+                self.assertTrue(same, "the two centerings must agree when balanced")
+            else:
+                self.assertFalse(same, "the two centerings must differ when sizes are uneven")
+
+        # And the shipped interval is finite and ordered on the uneven design.
+        frame = _make_clustered_data(g=6)
+        low, high = estimate(
+            frame,
+            design=PointDesign(sampling="srs", cluster_var="itinerary_id"),
+            bootstrap=True,
+            bootstrap_reps=199,
+        ).ratio_ci.wild
+        self.assertLess(low, high)
+
+    def test_an_unknown_method_is_refused(self):
+        """Falling back silently would hide a typo in an analysis script."""
+        with self.assertRaises(ValueError):
+            estimate(self.frame, design=self.design, bootstrap=False, ci_method="wilde")
+        with self.assertRaises(ValueError):
+            estimate(self.frame, design=self.design, bootstrap=False, se_method="wild")
+
+    def test_asking_for_an_uncomputed_interval_is_refused(self):
+        """``bootstrap=False`` with ``ci_method="wild"`` must not return normal."""
+        with self.assertRaises(ValueError):
+            estimate(self.frame, design=self.design, bootstrap=False, ci_method="wild")
+
+
+class TestEffectiveItineraries(unittest.TestCase):
+    """The number that predicts whether any interval here can be trusted.
+
+    Every cluster-robust interval in this package estimates between-itinerary
+    variance from the *effective* number of itineraries, not the nominal one, and
+    unequal sizes drive the two apart fast. Measured with lognormal itinerary
+    sizes at ICC 0.31 over 400 replicates, coverage of a nominal 95% interval was
+    inside a 3-sigma band at 15.2 and 18.4 effective itineraries and outside it at
+    11.8 and below -- for the normal, the t, and both bootstraps alike. No choice
+    of ``se_method`` escapes it, which is why this is a warning rather than a
+    method recommendation.
+    """
+
+    @staticmethod
+    def _frame(sizes, tau=0.12, seed=0):
+        """Counts whose itineraries have exactly the given sizes.
+
+        Args:
+            sizes: Number of frames in each itinerary.
+            tau: Spread of the per-itinerary rate.
+            seed: Seed for the generator.
+
+        Returns:
+            pd.DataFrame: Columns ``n_women``, ``n_people``, ``itinerary_id``.
+        """
+        rng = np.random.default_rng(seed)
+        cluster_ids = np.repeat(np.arange(len(sizes)), sizes)
+        rates = np.clip(0.3 + tau * rng.standard_normal(len(sizes)), 0.02, 0.98)
+        h = rng.poisson(8.0, cluster_ids.size)
+        w = rng.binomial(h, rates[cluster_ids])
+        return pd.DataFrame({"n_women": w, "n_people": h, "itinerary_id": cluster_ids})
+
+    def test_equal_sizes_give_back_the_nominal_count(self):
+        """With equal itineraries the Kish count is the plain count."""
+        result = estimate(
+            self._frame([20] * 20),
+            design=PointDesign(sampling="srs", cluster_var="itinerary_id"),
+            bootstrap=False,
+        )
+        self.assertEqual(result.diagnostics.n_clusters, 20)
+        self.assertAlmostEqual(result.diagnostics.n_clusters_eff, 20.0, places=6)
+
+    def test_one_dominant_itinerary_collapses_the_effective_count(self):
+        """Twenty itineraries can behave like two, and the count must say so."""
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            result = estimate(
+                self._frame([300] + [8] * 19),
+                design=PointDesign(sampling="srs", cluster_var="itinerary_id"),
+                bootstrap=False,
+            )
+        self.assertEqual(result.diagnostics.n_clusters, 20)
+        self.assertLess(result.diagnostics.n_clusters_eff, 4.0)
+
+    def test_a_collapsed_design_warns(self):
+        """Silence here is the failure mode: the interval still looks fine."""
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            estimate(
+                self._frame([300] + [8] * 19),
+                design=PointDesign(sampling="srs", cluster_var="itinerary_id"),
+                bootstrap=False,
+            )
+        messages = [str(w.message) for w in caught if "Itinerary sizes vary" in str(w.message)]
+        self.assertTrue(messages, "a design with ~2 effective itineraries must warn")
+        self.assertIn("indicative", messages[0])
+
+    def test_the_warning_can_be_switched_off_without_losing_the_number(self):
+        """The threshold is a judgement, so the caller gets to disagree with it.
+
+        Fifteen effective itineraries is measured rather than conventional, but
+        it is still an opinion, and an opinion compiled into a module constant is
+        one nobody can overrule. Passing None silences it. What must survive is
+        ``n_clusters_eff`` itself: the number is information, and only the view
+        taken of it is optional.
+        """
+        frame = self._frame([300] + [8] * 19)
+        design = PointDesign(sampling="srs", cluster_var="itinerary_id")
+
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            result = estimate(
+                frame,
+                design=design,
+                bootstrap=False,
+                warn_above_cluster_size_cv=None,
+            )
+        self.assertFalse(
+            [str(w.message) for w in caught if "Itinerary sizes vary" in str(w.message)],
+            "warn_above_cluster_size_cv=None must silence the warning",
+        )
+        self.assertLess(result.diagnostics.n_clusters_eff, 4.0)
+
+    def test_the_threshold_is_the_callers_to_set(self):
+        """A design healthy by the default must still warn under a stricter bar."""
+        # Mildly uneven: CV about 0.3, comfortably inside the 0.7 default.
+        frame = self._frame([28] * 10 + [14] * 10)
+        design = PointDesign(sampling="srs", cluster_var="itinerary_id")
+
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            quiet = estimate(frame, design=design, bootstrap=False)
+        self.assertFalse(
+            [str(w.message) for w in caught if "Itinerary sizes vary" in str(w.message)],
+            "a CV of about 0.3 is inside the default and should not warn",
+        )
+        self.assertLess(quiet.diagnostics.cluster_size_cv, 0.7)
+
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            estimate(
+                frame,
+                design=design,
+                bootstrap=False,
+                warn_above_cluster_size_cv=0.1,
+            )
+        self.assertTrue(
+            [str(w.message) for w in caught if "Itinerary sizes vary" in str(w.message)],
+            "lowering the bar to 0.1 should make the same design warn",
+        )
+
+    def test_a_healthy_design_stays_quiet(self):
+        """A warning that always fires is a warning nobody reads."""
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            estimate(
+                self._frame([20] * 20),
+                design=PointDesign(sampling="srs", cluster_var="itinerary_id"),
+                bootstrap=False,
+            )
+        self.assertFalse(
+            [str(w.message) for w in caught if "Itinerary sizes vary" in str(w.message)],
+            "20 equal itineraries should not trip the effective-count warning",
         )
 
 
