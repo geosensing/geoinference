@@ -82,9 +82,8 @@ class PointDesign:
                 f"Design '{self.sampling}' requires weight_var "
                 f"(inclusion probabilities or design weights)."
             )
-        if isinstance(self.annotation_frac, (int, float)):
-            if not 0 < self.annotation_frac <= 1.0:
-                raise ValueError("annotation_frac must be in (0, 1].")
+        if isinstance(self.annotation_frac, (int, float)) and not (0 < self.annotation_frac <= 1.0):
+            raise ValueError("annotation_frac must be in (0, 1].")
 
 
 @dataclass
