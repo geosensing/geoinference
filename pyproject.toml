@@ -50,7 +50,13 @@ module-root = ""
 
 [dependency-groups]
 dev = ["ruff>=0.1.0", "mypy>=1.5.0", "pandas-stubs", "scipy-stubs"]
-test = ["pytest>=7.4.0", "pytest-cov>=4.1.0"]
+test = [
+    "pytest>=7.4.0",
+    "pytest-cov>=4.1.0",
+    # A git reference, so it stays in dependency-groups and out of the published
+    # extras: PyPI rejects direct URL references in project metadata.
+    "simcheck @ git+https://github.com/finite-sample/simcheck",
+]
 docs = [
     "sphinx>=7.0",
     "furo",
