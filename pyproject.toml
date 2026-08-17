@@ -39,7 +39,7 @@ Issues = "https://github.com/geosensing/geoinference/issues"
 
 [project.optional-dependencies]
 test = ["pytest>=9.1.1", "pytest-cov>=4.1.0"]
-dev = ["ruff>=0.16.1", "mypy>=2.3.0"]
+dev = ["ruff>=0.16.2", "mypy>=2.3.0"]
 # The real geo_sampling -> allocator pipeline, used by geoinference.pipeline and the
 # validation example. Imported lazily; core geoinference needs none of it.
 pipeline = ["allocator", "geo-sampling"]
@@ -49,7 +49,7 @@ module-name = "geoinference"
 module-root = ""
 
 [dependency-groups]
-dev = ["ruff>=0.16.1", "mypy>=2.3.0", "pandas-stubs", "scipy-stubs"]
+dev = ["ruff>=0.16.2", "mypy>=2.3.0", "pandas-stubs", "scipy-stubs"]
 test = [
     "pytest>=9.1.1",
     "pytest-cov>=4.1.0",
