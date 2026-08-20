@@ -509,6 +509,10 @@ def run_pipeline(
         df = collect(pop, pipe, cfg, rng)
         if len(df) < cfg.n_itineraries:
             continue
+        # se_method is deliberately withheld: the point of the sweep is that
+        # `estimate` computes every SE from one fit and `_method_ci` picks
+        # afterwards, so the methods are compared on identical draws.
+        # preen: allow-dropped-arg
         res = estimate(
             df,
             "n_women",
@@ -615,6 +619,10 @@ def evaluate_scene(
                 "timestamp": ts,
             }
         )
+        # se_method is deliberately withheld: the point of the sweep is that
+        # `estimate` computes every SE from one fit and `_method_ci` picks
+        # afterwards, so the methods are compared on identical draws.
+        # preen: allow-dropped-arg
         res = estimate(
             frames,
             "n_women",
