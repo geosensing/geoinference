@@ -3,10 +3,9 @@
 Design-based inference for spatially distributed observation surveys.
 
 [![PyPI](https://img.shields.io/pypi/v/geoinference.svg)](https://pypi.org/project/geoinference/)
-[![Downloads](https://static.pepy.tech/badge/geoinference)](https://pepy.tech/project/geoinference)
 [![CI](https://github.com/geosensing/geoinference/actions/workflows/ci.yml/badge.svg)](https://github.com/geosensing/geoinference/actions/workflows/ci.yml)
 [![Docs](https://github.com/geosensing/geoinference/actions/workflows/docs.yml/badge.svg)](https://geosensing.github.io/geoinference/)
-[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 
 ## What this does
 
@@ -54,24 +53,30 @@ If the annotated frames carry coordinates and/or a timestamp, pass them and `est
 
 ```python
 result = estimate(
-    df, "n_women", "n_people",
+    df,
+    "n_women",
+    "n_people",
     design=PointDesign(sampling="srs", cluster_var="itinerary_id"),
-    lon_var="longitude", lat_var="latitude", time_var="timestamp",
+    lon_var="longitude",
+    lat_var="latitude",
+    time_var="timestamp",
 )
 ```
 
 You get an empirical variogram range, Moran's I (+ permutation p-value), a variogram-based **effective sample size** per axis (Griffith 2005; Watson 2021), and a within- vs between-itinerary semivariance ratio — so you can see whether the (stochastic) itinerary partition actually costs you information, and on which axis.
 
-## Estimate from a CSV (production)
+## Estimate from a file (production)
 
 ```python
-from geoinference import estimate_from_csv
+from geoinference import estimate_from_file
 
-result = estimate_from_csv("frames.csv")   # uses any of the optional columns present
+result = estimate_from_file("frames.parquet")  # uses any optional columns present
 print(result.summary())
 ```
 
-Expected columns (all configurable): `n_women`, `n_people` (required), `itinerary_id`, `longitude`, `latitude`, `timestamp` (optional — diagnostics turn on when present). Or from the shell: `python -m geoinference.io estimate frames.csv`.
+Expected columns (all configurable): `n_women`, `n_people` (required), `itinerary_id`, `longitude`, `latitude`, `timestamp` (optional — diagnostics turn on when present). Or from the shell: `python -m geoinference.io estimate frames.parquet`.
+
+The reader picks its format from the suffix: `.parquet`/`.pq`, or `.csv` (compressed or not). **Prefer Parquet.** CSV carries no types, so a count column with one missing value comes back as float and `timestamp` comes back as a string something downstream has to parse; Parquet gives back what the pipeline wrote.
 
 ## Validate a design before you trust the numbers
 

@@ -54,7 +54,9 @@ class TestCoverageCliff(unittest.TestCase):
         bootstrap reach ~0.90-0.94 (the gap to nominal 0.95 is the
         few-clusters limit); naive collapses toward ~0.6.
         """
-        cfg = SimConfig(range_s_m=2000.0, diurnal_amp=0.0, sd_t=0.0, n_sims=200, grid_n=16)
+        cfg = SimConfig(
+            range_s_m=2000.0, diurnal_amp=0.0, sd_t=0.0, n_sims=200, grid_n=16
+        )
         pipe = Pipeline("compact", routing="compact")
         naive = _run(cfg, pipe, se_method="naive")
         cluster = _run(cfg, pipe, se_method="cluster")
@@ -68,7 +70,9 @@ class TestCoverageCliff(unittest.TestCase):
 class TestTemporalBias(unittest.TestCase):
     def test_synced_starts_bias_fixed_by_staggering(self):
         """Strong diurnal effect: synced starts bias beta; staggering fixes it."""
-        cfg = SimConfig(range_s_m=600.0, diurnal_amp=1.5, sd_t=0.0, n_sims=120, grid_n=14)
+        cfg = SimConfig(
+            range_s_m=600.0, diurnal_amp=1.5, sd_t=0.0, n_sims=120, grid_n=14
+        )
         synced = _run(cfg, Pipeline("c", routing="compact", staggered_starts=False))
         stagger = _run(cfg, Pipeline("c", routing="compact", staggered_starts=True))
         self.assertGreater(abs(synced.bias), 0.05)
@@ -77,7 +81,9 @@ class TestTemporalBias(unittest.TestCase):
 
     def test_no_time_structure_no_bias(self):
         """No diurnal effect: start-time policy is irrelevant (no bias)."""
-        cfg = SimConfig(range_s_m=600.0, diurnal_amp=0.0, sd_t=0.0, n_sims=100, grid_n=14)
+        cfg = SimConfig(
+            range_s_m=600.0, diurnal_amp=0.0, sd_t=0.0, n_sims=100, grid_n=14
+        )
         synced = _run(cfg, Pipeline("c", routing="compact", staggered_starts=False))
         self.assertLess(abs(synced.bias), 0.02)
 

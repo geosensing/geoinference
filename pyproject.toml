@@ -1,5 +1,5 @@
 [build-system]
-requires = ["uv_build>=0.12.3,<0.13.0"]
+requires = ["uv_build>=0.12.5,<0.13"]
 build-backend = "uv_build"
 
 [project]
@@ -7,8 +7,9 @@ name = "geoinference"
 version = "0.1.0"
 description = "Design-based inference for spatially distributed observation surveys"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 license = "MIT"
+license-files = ["LICENSE"]
 authors = [
     {name = "Gaurav Sood", email = "gsood07@gmail.com"},
 ]
@@ -20,7 +21,6 @@ classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
     "Topic :: Scientific/Engineering :: Information Analysis",
-    "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Typing :: Typed",
@@ -28,6 +28,8 @@ classifiers = [
 dependencies = [
     "numpy>=1.24.0",
     "pandas>=3.0.5",
+    # pandas.read_parquet needs an engine; pyarrow is the one it prefers.
+    "pyarrow>=15",
     "scipy>=1.10.0",
 ]
 
@@ -38,8 +40,6 @@ Documentation = "https://geosensing.github.io/geoinference/"
 Issues = "https://github.com/geosensing/geoinference/issues"
 
 [project.optional-dependencies]
-test = ["pytest>=9.1.1", "pytest-cov>=4.1.0"]
-dev = ["ruff>=0.16.2", "mypy>=2.3.0"]
 # The real geo_sampling -> allocator pipeline, used by geoinference.pipeline and the
 # validation example. Imported lazily; core geoinference needs none of it.
 pipeline = ["allocator", "geo-sampling"]
@@ -48,8 +48,20 @@ pipeline = ["allocator", "geo-sampling"]
 module-name = "geoinference"
 module-root = ""
 
+[tool.pyright]
+include = ["geoinference"]
+typeCheckingMode = "standard"
+
+[tool.pydoclint]
+style = "google"
+arg-type-hints-in-docstring = false
+check-return-types = false
+check-class-attributes = false
+allow-init-docstring = true
+exclude = '\.venv|geoinference/tests|docs'
+
 [dependency-groups]
-dev = ["ruff>=0.16.2", "mypy>=2.3.0", "pandas-stubs", "scipy-stubs"]
+dev = ["ruff>=0.16.2", "pandas-stubs", "scipy-stubs", "pyright>=1.1.390", "pydoclint>=0.5", "pytest>=8"]
 test = [
     "pytest>=9.1.1",
     "pytest-cov>=4.1.0",
@@ -64,25 +76,45 @@ docs = [
     "linkify-it-py>=2.0",
     "sphinx-copybutton>=0.5",
     "sphinx-design>=0.5",
+    "py-canon @ git+https://github.com/gojiplus/py-canon@v1",
 ]
 
 [tool.pytest.ini_options]
 testpaths = ["geoinference/tests"]
 
 [tool.ruff]
-target-version = "py311"
-line-length = 100
+line-length = 88
+target-version = "py312"
 
-[tool.mypy]
-python_version = "3.11"
-warn_return_any = true
-disallow_untyped_defs = true
-exclude = ["geoinference/tests/"]
+[tool.ruff.lint]
+external = ["DOC"]
+select = [
+    "E", "W", "F", "I", "B", "C4", "UP", "N", "D", "S", "SIM", "T20", "PT", "RUF",
+    "PTH", "RET", "PIE", "FURB", "PERF", "DTZ", "LOG", "G", "TC", "FLY",
+    "RSE", "SLOT", "FA", "A", "EXE", "ICN", "PGH", "PLE", "ARG", "SLF",
+]
+# D203/D213: the google convention the fleet standard picks. W191/D206/D300:
+# ruff's own docs list these as always incompatible with `ruff format`, which
+# the standard also runs.
+ignore = ["D203", "D213", "W191", "D206", "D300"]
 
-[[tool.mypy.overrides]]
-module = ["geoinference.tests.*"]
-disallow_untyped_defs = false
+# The codebase writes grid dimensions and rates as "100 x 100" with the
+# multiplication sign, which is what the notation means.
+allowed-confusables = ["×"]
 
-[[tool.mypy.overrides]]
-module = ["allocator.*", "geo_sampling.*", "scipy.*"]
-ignore_missing_imports = true
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.per-file-ignores]
+# Tests live inside the package, not at the repo root. PT009/PT027: the
+# suite is unittest.TestCase throughout, so ruff's pytest-style assertion
+# rules would rewrite 140 assertions for no gain in what they check.
+"geoinference/tests/**" = ["S101", "D", "ARG", "SLF", "PT009", "PT027"]
+"docs/**" = ["D"]
+# `geoinference.io`'s CLI prints its result; that output is the interface.
+"geoinference/io.py" = ["T201"]
+# `python -m geoinference.simulate` prints its experiment tables.
+"geoinference/simulate.py" = ["T201"]
+# Worked examples print their results; that output is the point of them.
+"examples/**" = ["T201", "D"]
+

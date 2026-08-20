@@ -10,7 +10,9 @@
 ## Estimate from a CSV
 
 ```{eval-rst}
-.. autofunction:: geoinference.estimate_from_csv
+.. autofunction:: geoinference.estimate_from_file
+
+.. autofunction:: geoinference.read_frames
 ```
 
 ## Designs

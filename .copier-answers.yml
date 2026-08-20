@@ -1,0 +1,12 @@
+# Managed by copier — records template version for `copier update`. Do not edit.
+_commit: v1.2.0
+_src_path: gh:gojiplus/py-canon
+author_email: gsood07@gmail.com
+author_name: Gaurav Sood
+coverage_floor: 80
+default_branch: main
+description: Design-based inference for spatially distributed observation surveys
+needs_cli: false
+org: geosensing
+package_name: geoinference
+project_name: geoinference

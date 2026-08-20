@@ -1,5 +1,4 @@
-"""
-Result types for geoinference.
+"""Result types for geoinference.
 
 Structured dataclasses that carry estimates, standard errors,
 confidence intervals, and diagnostics from the inference pipeline.
@@ -138,7 +137,8 @@ class InferenceResult:
             "",
             "── Ratio estimand (people-weighted) ──",
             f"  Estimate:  {self.ratio:.4f}",
-            f"  SE:        {self.ratio_se.recommended:.4f}  ({self.ratio_se.method_used})",
+            f"  SE:        {self.ratio_se.recommended:.4f}  "
+            f"({self.ratio_se.method_used})",
             (
                 f"  95% CI:    [{self.ratio_ci.recommended[0]:.4f}, "
                 f"{self.ratio_ci.recommended[1]:.4f}]"
@@ -189,7 +189,13 @@ class InferenceResult:
         return out
 
     def __repr__(self) -> str:
+        """Summarize the result on one line.
+
+        Returns:
+            Both point estimates with the sample and cluster counts.
+        """
         return (
-            f"InferenceResult(ratio={self.ratio:.4f}, photo_mean={self.photo_mean:.4f}, "
-            f"n={self.n_obs}, G={self.n_clusters}, design='{self.design_name}')"
+            f"InferenceResult(ratio={self.ratio:.4f}, "
+            f"photo_mean={self.photo_mean:.4f}, n={self.n_obs}, "
+            f"G={self.n_clusters}, design='{self.design_name}')"
         )

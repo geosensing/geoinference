@@ -1,5 +1,4 @@
-"""
-Bridge from the real geosensing pipeline to a geoinference simulation scene.
+"""Bridge from the real geosensing pipeline to a geoinference simulation scene.
 
 This turns the actual ``geo_sampling`` → ``allocator`` output into a fixed
 "scene" — point coordinates, the itinerary partition, and per-frame visit
@@ -37,6 +36,11 @@ class Scene:
     time_of_day_min: np.ndarray  # minutes within the field "day" (drives diurnal DGP)
 
     def __len__(self) -> int:
+        """Return the number of frames.
+
+        Returns:
+            One per longitude entry.
+        """
         return len(self.longitude)
 
     def to_frame(self) -> pd.DataFrame:
@@ -52,6 +56,11 @@ class Scene:
 
     @property
     def n_itineraries(self) -> int:
+        """Count the distinct itineraries the frames belong to.
+
+        Returns:
+            The number of unique itinerary ids.
+        """
         return int(np.unique(self.itinerary_id).size)
 
     @property
@@ -85,7 +94,8 @@ def points_from_roads(roads: pd.DataFrame | str, per_segment: int = 1) -> pd.Dat
     needed = {"start_lat", "start_long", "end_lat", "end_long"}
     if not needed.issubset(df.columns):
         raise ValueError(
-            f"roads must have {sorted(needed)} or longitude/latitude; got {list(df.columns)}"
+            f"roads must have {sorted(needed)} or longitude/latitude; "
+            f"got {list(df.columns)}"
         )
     s_lon = df["start_long"].to_numpy(dtype=float)
     s_lat = df["start_lat"].to_numpy(dtype=float)
@@ -96,24 +106,6 @@ def points_from_roads(roads: pd.DataFrame | str, per_segment: int = 1) -> pd.Dat
     lon = (s_lon[:, None] + fracs[None, :] * (e_lon - s_lon)[:, None]).ravel()
     lat = (s_lat[:, None] + fracs[None, :] * (e_lat - s_lat)[:, None]).ravel()
     return pd.DataFrame({"longitude": lon, "latitude": lat})
-
-
-def sample_points(
-    country: str, region: str, n: int, seed: int | None = None, **kwargs: object
-) -> pd.DataFrame:
-    """Sample street locations with ``geo_sampling`` (needs network).
-
-    Returns a ``longitude``/``latitude`` DataFrame (segment midpoints). Lazily
-    imports ``geo_sampling``.
-    """
-    try:
-        import geo_sampling as gs  # type: ignore[import-untyped]
-    except ImportError as exc:  # pragma: no cover - exercised only without extra
-        raise ImportError(f"geo_sampling not available; {_PIPELINE_HINT}") from exc
-
-    segments = gs.sample_roads_for_region(country=country, region=region, n=n, seed=seed, **kwargs)
-    sampler = gs.RoadSampler(segments)
-    return points_from_roads(sampler.to_dataframe(segments))
 
 
 def build_itineraries(
@@ -130,7 +122,9 @@ def build_itineraries(
     point-index lists in visit order. Lazily imports ``allocator``.
     """
     try:
-        from allocator import create_itineraries
+        from allocator import (  # pyright: ignore[reportMissingImports]
+            create_itineraries,
+        )
     except ImportError as exc:  # pragma: no cover - exercised only without extra
         raise ImportError(f"allocator not available; {_PIPELINE_HINT}") from exc
 
@@ -230,7 +224,9 @@ def make_scene(
 ) -> Scene:
     """Convenience: roads CSV/frame → points → itineraries → timed ``Scene``."""
     points = points_from_roads(roads)
-    data, routes = build_itineraries(points, method=method, n_itineraries=n_itineraries, seed=seed)
+    data, routes = build_itineraries(
+        points, method=method, n_itineraries=n_itineraries, seed=seed
+    )
     return assign_visit_times(data, routes, seed=seed, **time_kwargs)  # type: ignore[arg-type]
 
 
@@ -257,8 +253,12 @@ def subsample_scene(
     rng = np.random.default_rng(seed)
     sample_idx = np.sort(rng.choice(n_uni, size=min(n_sample, n_uni), replace=False))
     pts = points.iloc[sample_idx].reset_index(drop=True)
-    data, routes = build_itineraries(pts, method=method, n_itineraries=n_itineraries, seed=seed)
-    scene = assign_visit_times(data, routes, days=days, stagger_starts=stagger_starts, seed=seed)
+    data, routes = build_itineraries(
+        pts, method=method, n_itineraries=n_itineraries, seed=seed
+    )
+    scene = assign_visit_times(
+        data, routes, days=days, stagger_starts=stagger_starts, seed=seed
+    )
     if len(scene) != len(sample_idx):
         raise RuntimeError("allocator dropped points; sample/scene misaligned")
     return sample_idx, scene

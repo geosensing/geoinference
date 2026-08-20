@@ -1,5 +1,4 @@
-"""
-Inference engine for geoinference.
+"""Inference engine for geoinference.
 
 The ``estimate()`` function is the main entry point. It takes annotated
 frame data plus a design object and returns point estimates, standard
@@ -141,7 +140,9 @@ def _cluster_robust_se_mean(w: np.ndarray, h: np.ndarray, labels: np.ndarray) ->
 
     s_g = np.array(
         [
-            np.sum(p[(labels == c) & mask] - theta) if np.any((labels == c) & mask) else 0.0
+            np.sum(p[(labels == c) & mask] - theta)
+            if np.any((labels == c) & mask)
+            else 0.0
             for c in unique
         ]
     )
@@ -258,7 +259,9 @@ def _mean_cluster_scores(
     unique = np.unique(labels)
     scores = np.array(
         [
-            np.sum(p[(labels == c) & mask] - theta) if np.any((labels == c) & mask) else 0.0
+            np.sum(p[(labels == c) & mask] - theta)
+            if np.any((labels == c) & mask)
+            else 0.0
             for c in unique
         ]
     )
@@ -281,6 +284,14 @@ def wild_cluster_bootstrap_ci(
     bootstrap (Cameron, Gelbach & Miller 2008) perturbs each cluster's
     linearized score by a Rademacher (+/-1) weight and studentizes, which
     restores near-nominal coverage with few clusters.
+
+    Args:
+        w: Per-observation women counts.
+        h: Per-observation people counts.
+        labels: Cluster labels.
+        reps: Bootstrap replicates.
+        ci_level: Coverage the interval claims.
+        seed: Source of the Rademacher draws.
 
     Returns:
         (cluster_robust_se, ci_lo, ci_hi). NaNs if G < 2.
@@ -396,8 +407,13 @@ def _compute_icc(values: np.ndarray, labels: np.ndarray) -> float:
         return float("nan")
 
     grand_mean = values.mean()
-    ssb = sum(np.sum(labels == c) * (values[labels == c].mean() - grand_mean) ** 2 for c in unique)
-    ssw = sum(np.sum((values[labels == c] - values[labels == c].mean()) ** 2) for c in unique)
+    ssb = sum(
+        np.sum(labels == c) * (values[labels == c].mean() - grand_mean) ** 2
+        for c in unique
+    )
+    ssw = sum(
+        np.sum((values[labels == c] - values[labels == c].mean()) ** 2) for c in unique
+    )
 
     msb = ssb / (g - 1)
     msw = ssw / (n - g) if n > g else 0.0
@@ -421,11 +437,14 @@ def _require_columns(data: pd.DataFrame, cols: list[str]) -> None:
     missing = [c for c in cols if c not in data.columns]
     if missing:
         raise ValueError(
-            f"Columns not found in data: {missing}. Available columns: {list(data.columns)}"
+            f"Columns not found in data: {missing}. "
+            f"Available columns: {list(data.columns)}"
         )
 
 
-def _axis_diagnostics(values: np.ndarray, dist: np.ndarray, seed: int) -> dict[str, float]:
+def _axis_diagnostics(
+    values: np.ndarray, dist: np.ndarray, seed: int
+) -> dict[str, float]:
     """Variogram range, correlation ratio, effective N, and Moran's I for one axis."""
     lags, gamma, counts = spatial.empirical_variogram(values, dist)
     c0, c1, rng_ = spatial.fit_variogram(lags, gamma, counts)
@@ -554,7 +573,9 @@ def _build_ci(
 
     if ci_method is not None:
         if ci_method not in available:
-            raise ValueError(f"ci_method must be one of {sorted(available)}, got {ci_method!r}")
+            raise ValueError(
+                f"ci_method must be one of {sorted(available)}, got {ci_method!r}"
+            )
         chosen = available[ci_method]
         if chosen is None:
             raise ValueError(
@@ -705,11 +726,22 @@ def estimate(
         and temporal dependence fields of ``diagnostics`` are NaN unless the
         corresponding coordinate/time columns are supplied.
 
+    Raises:
+        ValueError: If a named column is absent, or an argument is outside
+            the range the estimator accepts.
+
     Example:
+        >>> import pandas as pd
         >>> from geoinference import PointDesign, estimate
+        >>> df = pd.DataFrame({
+        ...     "n_women": [3, 4, 2, 5],
+        ...     "n_people": [10, 10, 10, 10],
+        ...     "itinerary_id": [0, 0, 1, 1],
+        ... })
         >>> design = PointDesign(sampling="srs", cluster_var="itinerary_id")
-        >>> result = estimate(df, "n_women", "n_people", design=design)
-        >>> print(result.summary())
+        >>> result = estimate(df, "n_women", "n_people", design=design, bootstrap=False)
+        >>> round(result.ratio, 3)
+        0.35
     """
     if design is None:
         design = PointDesign(sampling="srs")
@@ -809,7 +841,9 @@ def estimate(
             "rather than a standard error; ask for it with ci_method='wild'."
         )
 
-    def _pick_se(naive: float, cluster: float, boot: float | None, method: str) -> SEResult:
+    def _pick_se(
+        naive: float, cluster: float, boot: float | None, method: str
+    ) -> SEResult:
         if method == "naive":
             recommended = naive
         elif method == "cluster":
@@ -888,7 +922,11 @@ def estimate(
         else 0.0
     )
     size_cv = float(cluster_sizes.std() / cluster_sizes.mean()) if m_bar > 0 else 0.0
-    if warn_above_cluster_size_cv is not None and g >= 2 and size_cv > warn_above_cluster_size_cv:
+    if (
+        warn_above_cluster_size_cv is not None
+        and g >= 2
+        and size_cv > warn_above_cluster_size_cv
+    ):
         warnings.warn(
             f"Itinerary sizes vary a lot: coefficient of variation {size_cv:.2f} "
             f"across {g} itineraries, leaving {n_clusters_eff:.1f} effective. In "
@@ -918,6 +956,7 @@ def estimate(
             lat_var,
             time_var,
             seed,
+            max_dependence_points=max_dependence_points,
         )
 
     def _dep(key: str) -> float:
@@ -931,7 +970,9 @@ def estimate(
         n_clusters=g,
         cluster_sizes=cluster_sizes,
         cluster_size_mean=m_bar,
-        cluster_size_cv=(float(cluster_sizes.std() / cluster_sizes.mean()) if m_bar > 0 else 0.0),
+        cluster_size_cv=(
+            float(cluster_sizes.std() / cluster_sizes.mean()) if m_bar > 0 else 0.0
+        ),
         icc=icc,
         deff=deff,
         n_eff=n_eff,
