@@ -851,3 +851,103 @@ class TestEffectiveItineraries(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestBootstrapHonoursTheRequestedLevel(unittest.TestCase):
+    """The pairs cluster bootstrap ignored ci_level and always returned 95%.
+
+    `_cluster_bootstrap` took no `ci_level` and hardcoded `np.percentile(..., 2.5)`
+    and `97.5`, while `wild_cluster_bootstrap_ci` beside it honoured the argument.
+    So `estimate(ci_level=0.90)` returned a 90% wild interval and a 95% pairs
+    interval in the same result object, with nothing marking the difference.
+    """
+
+    @staticmethod
+    def _panel(seed=0):
+        rng = np.random.default_rng(seed)
+        g, per = 25, 20
+        labels = np.repeat(np.arange(g), per)
+        w = rng.random(g * per) + 0.5
+        h = rng.random(g * per) * 10 + 1.0
+        return w, h, labels
+
+    def test_a_narrower_level_gives_a_narrower_interval(self):
+        from geoinference.inference import _cluster_bootstrap
+
+        w, h, labels = self._panel()
+        est = lambda w_, h_: float((w_ * h_).sum() / h_.sum())
+
+        def width(level):
+            _, lo, hi = _cluster_bootstrap(
+                w,
+                h,
+                labels,
+                est,
+                reps=1500,
+                ci_level=level,
+                rng=np.random.default_rng(7),
+            )
+            return hi - lo
+
+        # Same replicates, same seed: only the percentiles differ, so this is a
+        # pure statement about the argument being read.
+        self.assertLess(width(0.80), width(0.90))
+        self.assertLess(width(0.90), width(0.95))
+
+    def test_the_bounds_are_the_requested_percentiles(self):
+        from geoinference.inference import _cluster_bootstrap
+
+        w, h, labels = self._panel(seed=3)
+        est = lambda w_, h_: float((w_ * h_).sum() / h_.sum())
+        _, lo, hi = _cluster_bootstrap(
+            w,
+            h,
+            labels,
+            est,
+            reps=1500,
+            ci_level=0.90,
+            rng=np.random.default_rng(11),
+        )
+        # Reproduce the draw and check the endpoints are the 5th and 95th
+        # percentiles rather than the 2.5th and 97.5th.
+        _, lo95, hi95 = _cluster_bootstrap(
+            w,
+            h,
+            labels,
+            est,
+            reps=1500,
+            ci_level=0.95,
+            rng=np.random.default_rng(11),
+        )
+        self.assertGreater(lo, lo95)
+        self.assertLess(hi, hi95)
+
+    def test_estimate_passes_the_level_through_to_both_bootstraps(self):
+        """The end-to-end version: the two intervals must claim the same level."""
+        rng = np.random.default_rng(5)
+        g, per = 20, 15
+        people = rng.integers(1, 8, g * per)
+        df = pd.DataFrame(
+            {
+                "itinerary": np.repeat(np.arange(g), per),
+                "n_people": people,
+                "n_women": rng.binomial(people, 0.4),
+            }
+        )
+        design = PointDesign(cluster_var="itinerary")
+
+        wide = estimate(
+            df, "n_women", "n_people", design=design, ci_level=0.95, bootstrap_reps=400, seed=1
+        )
+        narrow = estimate(
+            df, "n_women", "n_people", design=design, ci_level=0.80, bootstrap_reps=400, seed=1
+        )
+
+        def span(ci):
+            return ci[1] - ci[0]
+
+        self.assertLess(
+            span(narrow.ratio_ci.bootstrap),
+            span(wide.ratio_ci.bootstrap),
+            "the pairs bootstrap interval did not respond to ci_level",
+        )

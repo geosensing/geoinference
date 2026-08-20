@@ -333,9 +333,27 @@ def _cluster_bootstrap(
     labels: np.ndarray,
     estimator_fn: Callable[[np.ndarray, np.ndarray], float],
     reps: int = 2000,
+    ci_level: float = 0.95,
     rng: np.random.Generator | None = None,
 ) -> tuple[float, float, float]:
-    """Cluster bootstrap: resample clusters, return (se, ci_lo, ci_hi)."""
+    """Cluster bootstrap: resample clusters, return (se, ci_lo, ci_hi).
+
+    Args:
+        w: Per-observation weights.
+        h: Per-observation counts.
+        labels: Cluster labels.
+        estimator_fn: Maps ``(w, h)`` to the statistic.
+        reps: Bootstrap replicates.
+        ci_level: Coverage the interval claims. This parameter did not exist and
+            the percentiles were hardcoded at 2.5 and 97.5, so asking
+            :func:`estimate` for a 90% interval returned a 95% one here while
+            the wild bootstrap beside it honoured the request -- two intervals
+            at different levels in one result object, and nothing said so.
+        rng: Source of randomness.
+
+    Returns:
+        tuple: Standard error, lower bound, upper bound.
+    """
     if rng is None:
         rng = np.random.default_rng(0)
 
@@ -359,8 +377,9 @@ def _cluster_bootstrap(
         return float("nan"), float("nan"), float("nan")
 
     se = float(np.std(valid, ddof=1))
-    lo = float(np.percentile(valid, 2.5))
-    hi = float(np.percentile(valid, 97.5))
+    alpha = 1 - ci_level
+    lo = float(np.percentile(valid, 100 * alpha / 2))
+    hi = float(np.percentile(valid, 100 * (1 - alpha / 2)))
     return se, lo, hi
 
 
@@ -752,10 +771,22 @@ def estimate(
         # between-itinerary variation than the design does; nor is it
         # studentised, so it gets no small-sample refinement.
         se_ratio_boot, boot_ratio_lo, boot_ratio_hi = _cluster_bootstrap(
-            w, h, labels, _ratio_estimator, reps=bootstrap_reps, rng=rng
+            w,
+            h,
+            labels,
+            _ratio_estimator,
+            reps=bootstrap_reps,
+            ci_level=ci_level,
+            rng=rng,
         )
         se_mean_boot, boot_mean_lo, boot_mean_hi = _cluster_bootstrap(
-            w, h, labels, _photo_mean_estimator, reps=bootstrap_reps, rng=rng
+            w,
+            h,
+            labels,
+            _photo_mean_estimator,
+            reps=bootstrap_reps,
+            ci_level=ci_level,
+            rng=rng,
         )
 
         _, wild_r_lo, wild_r_hi = wild_cluster_bootstrap_ci(
