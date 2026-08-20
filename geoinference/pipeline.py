@@ -108,26 +108,6 @@ def points_from_roads(roads: pd.DataFrame | str, per_segment: int = 1) -> pd.Dat
     return pd.DataFrame({"longitude": lon, "latitude": lat})
 
 
-def sample_points(
-    country: str, region: str, n: int, seed: int | None = None, **kwargs: object
-) -> pd.DataFrame:
-    """Sample street locations with ``geo_sampling`` (needs network).
-
-    Returns a ``longitude``/``latitude`` DataFrame (segment midpoints). Lazily
-    imports ``geo_sampling``.
-    """
-    try:
-        import geo_sampling as gs  # type: ignore[import-untyped]
-    except ImportError as exc:  # pragma: no cover - exercised only without extra
-        raise ImportError(f"geo_sampling not available; {_PIPELINE_HINT}") from exc
-
-    segments = gs.sample_roads_for_region(
-        country=country, region=region, n=n, seed=seed, **kwargs
-    )
-    sampler = gs.RoadSampler(segments)
-    return points_from_roads(sampler.to_dataframe(segments))
-
-
 def build_itineraries(
     points: pd.DataFrame,
     method: str = "random_partition",

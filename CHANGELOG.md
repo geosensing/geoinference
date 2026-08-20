@@ -15,6 +15,16 @@ All notable changes to this project are documented here. The format follows
   frame set changed nothing. Regression tests assert the requested cap appears
   in the subsampling warning.
 
+### Removed
+
+- **`pipeline.sample_points` and the example's `--live` flag.** The function
+  called `geo_sampling.sample_roads_for_region` and `geo_sampling.RoadSampler`.
+  Neither exists: `geo_sampling` exports nothing at the top level, being a pair
+  of CLI scripts (`geo_roads`, `sample_roads`). The function could never have
+  run, and pyright said so as soon as the standard turned it on. Build a
+  universe from a roads file with `points_from_roads` instead, which is what
+  the example and the tests already do.
+
 ### Changed
 
 - **`estimate_from_csv` is now `estimate_from_file`**, and the format comes from
@@ -40,5 +50,8 @@ All notable changes to this project are documented here. The format follows
 ### Added
 
 - A changelog, a `CITATION.cff`, and a pre-commit configuration.
+- The `>>>` examples in the package and `estimate` docstrings are real
+  doctests now: they build their own frame and assert a value, so the docs
+  build checks them. They previously referenced an undefined `df`.
 
 [Unreleased]: https://github.com/geosensing/geoinference/commits/main

@@ -731,10 +731,17 @@ def estimate(
             the range the estimator accepts.
 
     Example:
+        >>> import pandas as pd
         >>> from geoinference import PointDesign, estimate
+        >>> df = pd.DataFrame({
+        ...     "n_women": [3, 4, 2, 5],
+        ...     "n_people": [10, 10, 10, 10],
+        ...     "itinerary_id": [0, 0, 1, 1],
+        ... })
         >>> design = PointDesign(sampling="srs", cluster_var="itinerary_id")
-        >>> result = estimate(df, "n_women", "n_people", design=design)
-        >>> print(result.summary())
+        >>> result = estimate(df, "n_women", "n_people", design=design, bootstrap=False)
+        >>> round(result.ratio, 3)
+        0.35
     """
     if design is None:
         design = PointDesign(sampling="srs")

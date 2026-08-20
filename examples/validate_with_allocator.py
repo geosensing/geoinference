@@ -4,8 +4,8 @@ pipeline, then show the production estimate path.
 
 What this does, end to end:
 
-1. Take a city's road network (the bundled Delhi segments by default; or live
-   ``geo_sampling`` with ``--live``) and densify it into a candidate universe.
+1. Take a city's road network (the bundled Delhi segments by default, or any
+   roads CSV via ``--roads``) and densify it into a candidate universe.
 2. Draw a probability sample of locations and route them into itineraries with
    the real ``allocator`` (this is the design you actually run in the field),
    spread over a multi-week operation.
@@ -39,7 +39,7 @@ import numpy as np
 import pandas as pd
 
 from geoinference import PointDesign, estimate
-from geoinference.pipeline import points_from_roads, sample_points, subsample_scene
+from geoinference.pipeline import points_from_roads, subsample_scene
 from geoinference.simulate import (
     PopulationFactory,
     SimConfig,
@@ -52,13 +52,6 @@ SE_METHODS = ["naive", "cluster", "wcb"]
 
 
 def _universe(args: argparse.Namespace):
-    if args.live:
-        print(
-            f"Sampling {args.universe} road locations live from geo_sampling "
-            f"({args.country} / {args.region}) ..."
-        )
-        roads = sample_points(args.country, args.region, n=args.universe, seed=0)
-        return points_from_roads(roads)
     print(
         f"Building candidate universe from {args.roads} "
         f"(densify x{args.per_segment}) ..."
@@ -95,12 +88,6 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--days", type=int, default=14)
     parser.add_argument("--n-sims", type=int, default=200)
     parser.add_argument("--range-m", type=float, default=800.0)
-    parser.add_argument(
-        "--live", action="store_true", help="sample via geo_sampling (network)"
-    )
-    parser.add_argument("--country", default="India")
-    parser.add_argument("--region", default="NCT of Delhi")
-    parser.add_argument("--universe", type=int, default=8000)
     args = parser.parse_args(argv)
 
     uni = _universe(args)
