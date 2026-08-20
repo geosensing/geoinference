@@ -8,6 +8,22 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- **`run_pipeline(ci_level=...)` and `evaluate_scene(ci_level=...)` were
+  ignored by the pairs bootstrap.** `_method_ci` builds the naive/cluster/auto
+  intervals itself from `ci_level` and forwards it to the wild cluster
+  bootstrap, but for `se_method="boot"` it reads `res.ratio_ci.bootstrap`
+  straight off the result — and the `estimate` call omitted `ci_level`, so that
+  interval was always the 95% default. Measured coverage came out **identical
+  at every requested level** (0.817 at 0.50, 0.80 and 0.99), which makes a
+  bootstrap coverage table at any level but 0.95 fiction. It now tracks the
+  request: 0.517 / 0.733 / 0.883. This is the same defect as the `ci_level` fix
+  in #12, one layer up: #12 taught `_cluster_bootstrap` to honour the level,
+  and the simulation layer then still failed to ask for it.
+- Each replication of the Monte Carlo test harness now draws its own bootstrap
+  seed. Every replication previously resampled with `estimate`'s default seed,
+  so the bootstrap noise was common to all of them — not something a coverage
+  study is entitled to assume. The seed comes from a separate stream so the
+  data seeds, which the coverage thresholds are tuned against, do not move.
 - **`estimate(max_dependence_points=N)` did nothing.** The argument was
   documented, `estimate_from_file` forwarded it, and `_dependence_diagnostics`
   reads it and subsamples above it — but the call inside `estimate` omitted it,

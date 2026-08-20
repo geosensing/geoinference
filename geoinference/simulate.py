@@ -514,6 +514,10 @@ def run_pipeline(
             "n_women",
             "n_people",
             design=design,
+            # Without this the pairs-bootstrap interval read back through
+            # `_method_ci` is `estimate`'s 95% default whatever level was
+            # asked for, so a coverage table at any other level is fiction.
+            ci_level=ci_level,
             bootstrap=(se_method == "boot"),
             bootstrap_reps=599,
             lon_var="longitude" if spatial_diag else None,
@@ -616,6 +620,10 @@ def evaluate_scene(
             "n_women",
             "n_people",
             design=design,
+            # Without this the pairs-bootstrap interval read back through
+            # `_method_ci` is `estimate`'s 95% default whatever level was
+            # asked for, so a coverage table at any other level is fiction.
+            ci_level=ci_level,
             bootstrap=(se_method == "boot"),
             bootstrap_reps=599,
             lon_var="longitude" if spatial_diag else None,

@@ -88,6 +88,43 @@ class TestTemporalBias(unittest.TestCase):
         self.assertLess(abs(synced.bias), 0.02)
 
 
+class TestTheRequestedLevelReachesEveryMethod(unittest.TestCase):
+    """`run_pipeline(ci_level=...)` was ignored by the bootstrap method.
+
+    `_method_ci` builds the naive/cluster/auto intervals itself from
+    ``ci_level``, and passes ``ci_level`` to the wild cluster bootstrap. But
+    for ``se_method="boot"`` it reads ``res.ratio_ci.bootstrap`` straight off
+    the ``InferenceResult`` — and the ``estimate`` call omitted ``ci_level``,
+    so that interval was always ``estimate``'s 95% default. Coverage came out
+    identical at every requested level, which makes a coverage table at any
+    level but 0.95 fiction.
+    """
+
+    CFG = SimConfig(range_s_m=600.0, diurnal_amp=0.0, sd_t=0.0, n_sims=60, grid_n=12)
+
+    def _coverage(self, se_method: str, ci_level: float) -> float:
+        fac = PopulationFactory(self.CFG)
+        return run_pipeline(
+            fac,
+            Pipeline("compact", routing="compact"),
+            self.CFG,
+            se_method=se_method,
+            ci_level=ci_level,
+        ).coverage
+
+    def test_a_wider_level_covers_more_often(self):
+        for method in ("boot", "naive", "cluster", "wcb"):
+            with self.subTest(se_method=method):
+                narrow = self._coverage(method, 0.50)
+                wide = self._coverage(method, 0.99)
+                self.assertGreater(
+                    wide,
+                    narrow,
+                    f"{method}: coverage did not respond to ci_level "
+                    f"(0.50 -> {narrow:.3f}, 0.99 -> {wide:.3f})",
+                )
+
+
 if __name__ == "__main__":
     warnings.simplefilter("ignore")
     unittest.main()

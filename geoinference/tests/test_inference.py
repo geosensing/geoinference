@@ -373,6 +373,9 @@ class TestCoverageSimulation(unittest.TestCase):
         """
         reps = reps_for() if reps is None else reps
         rng = np.random.default_rng(seed)
+        # A separate stream, so adding a per-replication bootstrap seed does
+        # not shift the data seeds the coverage thresholds were tuned against.
+        boot_rng = np.random.default_rng(seed + 1)
 
         estimates, errors, covered = [], [], []
         for _ in range(reps):
@@ -384,6 +387,11 @@ class TestCoverageSimulation(unittest.TestCase):
                 design=design_fn(),
                 bootstrap=bootstrap,
                 bootstrap_reps=bootstrap_reps,
+                # Not left at estimate's default: otherwise every replication
+                # resamples with the same seed and the bootstrap noise is
+                # common to all of them, which is not what a coverage study is
+                # entitled to assume.
+                seed=int(boot_rng.integers(2**31)),
             )
             point = getattr(result, estimand)
             if np.isnan(point):
