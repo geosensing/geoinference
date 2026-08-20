@@ -35,7 +35,9 @@ def _make_test_data(
     rng = np.random.default_rng(seed)
     cluster_ids = np.repeat(np.arange(g), n // g)
     if len(cluster_ids) < n:
-        cluster_ids = np.concatenate([cluster_ids, np.zeros(n - len(cluster_ids), dtype=int)])
+        cluster_ids = np.concatenate(
+            [cluster_ids, np.zeros(n - len(cluster_ids), dtype=int)]
+        )
 
     h = rng.poisson(lam, n)
     w = rng.binomial(h, true_p)
@@ -101,7 +103,9 @@ def _make_clustered_data(
     rng = np.random.default_rng(seed)
     cluster_ids = np.repeat(np.arange(g), n // g)
     if len(cluster_ids) < n:
-        cluster_ids = np.concatenate([cluster_ids, np.zeros(n - len(cluster_ids), dtype=int)])
+        cluster_ids = np.concatenate(
+            [cluster_ids, np.zeros(n - len(cluster_ids), dtype=int)]
+        )
 
     # Two walks inside each itinerary, so walk_id is a genuinely finer grouping.
     walk_ids = cluster_ids * 2 + (np.arange(n) % 2)
@@ -111,7 +115,9 @@ def _make_clustered_data(
     elif correlated_at == "walk":
         carrier = walk_ids
     else:
-        raise ValueError(f"correlated_at must be 'itinerary' or 'walk', got {correlated_at!r}")
+        raise ValueError(
+            f"correlated_at must be 'itinerary' or 'walk', got {correlated_at!r}"
+        )
 
     rates = np.clip(true_p + tau * rng.standard_normal(carrier.max() + 1), 0.02, 0.98)
     h = rng.poisson(lam, n)
@@ -179,7 +185,9 @@ class TestEstimateBasic(unittest.TestCase):
 
     def test_returns_inference_result(self):
         design = PointDesign(sampling="srs", cluster_var="itinerary_id")
-        result = estimate(self.df, "n_women", "n_people", design=design, bootstrap=False)
+        result = estimate(
+            self.df, "n_women", "n_people", design=design, bootstrap=False
+        )
         self.assertIsInstance(result, InferenceResult)
 
     def test_ratio_in_range(self):
@@ -194,7 +202,9 @@ class TestEstimateBasic(unittest.TestCase):
 
     def test_se_positive(self):
         design = PointDesign(sampling="srs", cluster_var="itinerary_id")
-        result = estimate(self.df, "n_women", "n_people", design=design, bootstrap=False)
+        result = estimate(
+            self.df, "n_women", "n_people", design=design, bootstrap=False
+        )
         self.assertGreater(result.ratio_se.naive, 0)
         self.assertGreater(result.ratio_se.cluster, 0)
         self.assertGreater(result.photo_mean_se.naive, 0)
@@ -209,12 +219,16 @@ class TestEstimateBasic(unittest.TestCase):
     def test_no_cluster_var(self):
         """Without cluster_var, each obs is its own cluster."""
         design = PointDesign(sampling="srs")
-        result = estimate(self.df, "n_women", "n_people", design=design, bootstrap=False)
+        result = estimate(
+            self.df, "n_women", "n_people", design=design, bootstrap=False
+        )
         self.assertEqual(result.n_clusters, len(self.df))
 
     def test_walk_design(self):
         design = WalkDesign(walk_var="walk_id")
-        result = estimate(self.df, "n_women", "n_people", design=design, bootstrap=False)
+        result = estimate(
+            self.df, "n_women", "n_people", design=design, bootstrap=False
+        )
         self.assertEqual(result.design_name, "walk_transect")
         self.assertEqual(result.ratio_se.method_used, "cluster")
 
@@ -232,7 +246,9 @@ class TestEstimateBasic(unittest.TestCase):
 
     def test_diagnostics_populated(self):
         design = PointDesign(sampling="srs", cluster_var="itinerary_id")
-        result = estimate(self.df, "n_women", "n_people", design=design, bootstrap=False)
+        result = estimate(
+            self.df, "n_women", "n_people", design=design, bootstrap=False
+        )
         d = result.diagnostics
         self.assertEqual(d.n_obs, 200)
         self.assertGreater(d.n_positive_frames, 0)
@@ -605,7 +621,9 @@ class TestMethodMenuIsConsistent(unittest.TestCase):
     def setUp(self):
         self.frame = _make_clustered_data(g=10)
         self.design = PointDesign(sampling="srs", cluster_var="itinerary_id")
-        self.result = estimate(self.frame, design=self.design, bootstrap=True, bootstrap_reps=199)
+        self.result = estimate(
+            self.frame, design=self.design, bootstrap=True, bootstrap_reps=199
+        )
 
     def test_both_estimands_report_every_standard_error(self):
         """Three standard errors each, none missing."""
@@ -688,16 +706,21 @@ class TestMethodMenuIsConsistent(unittest.TestCase):
             if label == "equal":
                 self.assertTrue(same, "the two centerings must agree when balanced")
             else:
-                self.assertFalse(same, "the two centerings must differ when sizes are uneven")
+                self.assertFalse(
+                    same, "the two centerings must differ when sizes are uneven"
+                )
 
         # And the shipped interval is finite and ordered on the uneven design.
         frame = _make_clustered_data(g=6)
-        low, high = estimate(
+        wild = estimate(
             frame,
             design=PointDesign(sampling="srs", cluster_var="itinerary_id"),
             bootstrap=True,
             bootstrap_reps=199,
         ).ratio_ci.wild
+        self.assertIsNotNone(wild, "the wild interval must be computed here")
+        assert wild is not None
+        low, high = wild
         self.assertLess(low, high)
 
     def test_an_unknown_method_is_refused(self):
@@ -776,7 +799,9 @@ class TestEffectiveItineraries(unittest.TestCase):
                 design=PointDesign(sampling="srs", cluster_var="itinerary_id"),
                 bootstrap=False,
             )
-        messages = [str(w.message) for w in caught if "Itinerary sizes vary" in str(w.message)]
+        messages = [
+            str(w.message) for w in caught if "Itinerary sizes vary" in str(w.message)
+        ]
         self.assertTrue(messages, "a design with ~2 effective itineraries must warn")
         self.assertIn("indicative", messages[0])
 
@@ -801,7 +826,11 @@ class TestEffectiveItineraries(unittest.TestCase):
                 warn_above_cluster_size_cv=None,
             )
         self.assertFalse(
-            [str(w.message) for w in caught if "Itinerary sizes vary" in str(w.message)],
+            [
+                str(w.message)
+                for w in caught
+                if "Itinerary sizes vary" in str(w.message)
+            ],
             "warn_above_cluster_size_cv=None must silence the warning",
         )
         self.assertLess(result.diagnostics.n_clusters_eff, 4.0)
@@ -816,7 +845,11 @@ class TestEffectiveItineraries(unittest.TestCase):
             warnings.simplefilter("always")
             quiet = estimate(frame, design=design, bootstrap=False)
         self.assertFalse(
-            [str(w.message) for w in caught if "Itinerary sizes vary" in str(w.message)],
+            [
+                str(w.message)
+                for w in caught
+                if "Itinerary sizes vary" in str(w.message)
+            ],
             "a CV of about 0.3 is inside the default and should not warn",
         )
         self.assertLess(quiet.diagnostics.cluster_size_cv, 0.7)
@@ -830,7 +863,11 @@ class TestEffectiveItineraries(unittest.TestCase):
                 warn_above_cluster_size_cv=0.1,
             )
         self.assertTrue(
-            [str(w.message) for w in caught if "Itinerary sizes vary" in str(w.message)],
+            [
+                str(w.message)
+                for w in caught
+                if "Itinerary sizes vary" in str(w.message)
+            ],
             "lowering the bar to 0.1 should make the same design warn",
         )
 
@@ -844,7 +881,11 @@ class TestEffectiveItineraries(unittest.TestCase):
                 bootstrap=False,
             )
         self.assertFalse(
-            [str(w.message) for w in caught if "Itinerary sizes vary" in str(w.message)],
+            [
+                str(w.message)
+                for w in caught
+                if "Itinerary sizes vary" in str(w.message)
+            ],
             "20 equal itineraries should not trip the effective-count warning",
         )
 
@@ -875,7 +916,9 @@ class TestBootstrapHonoursTheRequestedLevel(unittest.TestCase):
         from geoinference.inference import _cluster_bootstrap
 
         w, h, labels = self._panel()
-        est = lambda w_, h_: float((w_ * h_).sum() / h_.sum())
+
+        def est(w_, h_):
+            return float((w_ * h_).sum() / h_.sum())
 
         def width(level):
             _, lo, hi = _cluster_bootstrap(
@@ -898,7 +941,10 @@ class TestBootstrapHonoursTheRequestedLevel(unittest.TestCase):
         from geoinference.inference import _cluster_bootstrap
 
         w, h, labels = self._panel(seed=3)
-        est = lambda w_, h_: float((w_ * h_).sum() / h_.sum())
+
+        def est(w_, h_):
+            return float((w_ * h_).sum() / h_.sum())
+
         _, lo, hi = _cluster_bootstrap(
             w,
             h,
@@ -937,10 +983,22 @@ class TestBootstrapHonoursTheRequestedLevel(unittest.TestCase):
         design = PointDesign(cluster_var="itinerary")
 
         wide = estimate(
-            df, "n_women", "n_people", design=design, ci_level=0.95, bootstrap_reps=400, seed=1
+            df,
+            "n_women",
+            "n_people",
+            design=design,
+            ci_level=0.95,
+            bootstrap_reps=400,
+            seed=1,
         )
         narrow = estimate(
-            df, "n_women", "n_people", design=design, ci_level=0.80, bootstrap_reps=400, seed=1
+            df,
+            "n_women",
+            "n_people",
+            design=design,
+            ci_level=0.80,
+            bootstrap_reps=400,
+            seed=1,
         )
 
         def span(ci):
@@ -950,4 +1008,60 @@ class TestBootstrapHonoursTheRequestedLevel(unittest.TestCase):
             span(narrow.ratio_ci.bootstrap),
             span(wide.ratio_ci.bootstrap),
             "the pairs bootstrap interval did not respond to ci_level",
+        )
+
+
+class TestEstimateHonoursMaxDependencePoints(unittest.TestCase):
+    """`estimate` accepted `max_dependence_points` and never passed it on.
+
+    `_dependence_diagnostics` takes the cap and subsamples above it, warning
+    when it does. `estimate` documented the argument and `estimate_from_csv`
+    forwarded it, but the call inside `estimate` omitted it, so every run used
+    the 2500 default. Asking for a cheaper diagnostic did nothing.
+    """
+
+    @staticmethod
+    def _spatial_frame(n: int = 60, seed: int = 7) -> pd.DataFrame:
+        rng = np.random.default_rng(seed)
+        h = rng.poisson(8.0, n) + 1
+        return pd.DataFrame(
+            {
+                "n_women": rng.binomial(h, 0.3),
+                "n_people": h,
+                "itinerary_id": rng.integers(0, 6, n),
+                "lon": rng.uniform(-0.05, 0.05, n),
+                "lat": rng.uniform(51.5, 51.55, n),
+            }
+        )
+
+    def _estimate(self, cap: int) -> list[warnings.WarningMessage]:
+        data = self._spatial_frame()
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            estimate(
+                data,
+                design=PointDesign(sampling="srs", cluster_var="itinerary_id"),
+                lon_var="lon",
+                lat_var="lat",
+                bootstrap=False,
+                max_dependence_points=cap,
+            )
+        return caught
+
+    def test_a_cap_below_the_frame_count_subsamples(self):
+        caught = self._estimate(cap=25)
+
+        messages = [str(w.message) for w in caught]
+        subsampled = [m for m in messages if "subsampled to" in m]
+        self.assertTrue(subsampled, f"expected a subsampling warning, got: {messages}")
+        # The cap the caller asked for, not the 2500 default.
+        self.assertIn("subsampled to 25 of 60", subsampled[0])
+
+    def test_a_cap_above_the_frame_count_does_not_subsample(self):
+        caught = self._estimate(cap=500)
+
+        messages = [str(w.message) for w in caught]
+        self.assertFalse(
+            [m for m in messages if "subsampled to" in m],
+            f"unexpected subsampling warning: {messages}",
         )

@@ -1,5 +1,4 @@
-"""
-geoinference: Design-based inference for spatially distributed observation surveys.
+"""geoinference: Design-based inference for spatially distributed observation surveys.
 
 Takes annotated frame data from the geosensing pipeline (geo-sampling + allocator)
 and produces correct point estimates, standard errors, and confidence intervals,
@@ -12,12 +11,14 @@ Quick start:
     >>> print(result.summary())
 """
 
-__version__ = "0.1.0"
+from importlib.metadata import version
 
 from .designs import Design, PointDesign, WalkDesign
 from .inference import estimate
-from .io import estimate_from_csv
+from .io import estimate_from_file, read_frames
 from .types import CIResult, Diagnostics, InferenceResult, SEResult
+
+__version__ = version("geoinference")
 
 __all__ = [
     "CIResult",
@@ -28,5 +29,6 @@ __all__ = [
     "SEResult",
     "WalkDesign",
     "estimate",
-    "estimate_from_csv",
+    "estimate_from_file",
+    "read_frames",
 ]

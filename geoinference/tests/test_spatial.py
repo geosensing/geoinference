@@ -63,7 +63,9 @@ class TestTimeGap(unittest.TestCase):
         self.assertAlmostEqual(g[1, 2], 15.0)
 
     def test_datetime(self):
-        ts = pd.to_datetime(["2024-01-01 09:00", "2024-01-01 09:05", "2024-01-01 10:00"]).to_numpy()
+        ts = pd.to_datetime(
+            ["2024-01-01 09:00", "2024-01-01 09:05", "2024-01-01 10:00"]
+        ).to_numpy()
         g = time_gap_matrix(ts)
         self.assertAlmostEqual(g[0, 1], 300.0)  # 5 min
         self.assertAlmostEqual(g[0, 2], 3600.0)  # 1 hr
@@ -82,7 +84,9 @@ class TestVariogram(unittest.TestCase):
             _exp_field(coords, true_range, seed=0), dist, n_bins=15
         )
         gammas = [
-            empirical_variogram(_exp_field(coords, true_range, seed=s), dist, n_bins=15)[1]
+            empirical_variogram(
+                _exp_field(coords, true_range, seed=s), dist, n_bins=15
+            )[1]
             for s in range(25)
         ]
         gamma_bar = np.mean(np.vstack(gammas), axis=0)

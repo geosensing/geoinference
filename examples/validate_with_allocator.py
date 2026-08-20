@@ -59,7 +59,10 @@ def _universe(args: argparse.Namespace):
         )
         roads = sample_points(args.country, args.region, n=args.universe, seed=0)
         return points_from_roads(roads)
-    print(f"Building candidate universe from {args.roads} (densify x{args.per_segment}) ...")
+    print(
+        f"Building candidate universe from {args.roads} "
+        f"(densify x{args.per_segment}) ..."
+    )
     return points_from_roads(args.roads, per_segment=args.per_segment)
 
 
@@ -92,7 +95,9 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--days", type=int, default=14)
     parser.add_argument("--n-sims", type=int, default=200)
     parser.add_argument("--range-m", type=float, default=800.0)
-    parser.add_argument("--live", action="store_true", help="sample via geo_sampling (network)")
+    parser.add_argument(
+        "--live", action="store_true", help="sample via geo_sampling (network)"
+    )
     parser.add_argument("--country", default="India")
     parser.add_argument("--region", default="NCT of Delhi")
     parser.add_argument("--universe", type=int, default=8000)
@@ -116,10 +121,13 @@ def main(argv: list[str] | None = None) -> None:
     frac = len(scene) / len(uni)
     print(
         f"Survey: {len(scene)} frames in {scene.n_itineraries} itineraries over "
-        f"{scene.day_span:.1f} days  (sampling fraction f={frac:.3f}, method={args.method})"
+        f"{scene.day_span:.1f} days  "
+        f"(sampling fraction f={frac:.3f}, method={args.method})"
     )
 
-    cfg_sp = SimConfig(range_s_m=args.range_m, diurnal_amp=0.0, sd_t=0.0, n_sims=args.n_sims)
+    cfg_sp = SimConfig(
+        range_s_m=args.range_m, diurnal_amp=0.0, sd_t=0.0, n_sims=args.n_sims
+    )
     factory = PopulationFactory(cfg_sp, lon, lat)
     _coverage_table(
         factory,
@@ -162,7 +170,11 @@ def main(argv: list[str] | None = None) -> None:
 
     # --- Scenario B: time-of-day bias ---------------------------------------
     cfg_t = SimConfig(
-        range_s_m=args.range_m, diurnal_amp=1.2, range_t_min=60.0, sd_t=0.4, n_sims=args.n_sims
+        range_s_m=args.range_m,
+        diurnal_amp=1.2,
+        range_t_min=60.0,
+        sd_t=0.4,
+        n_sims=args.n_sims,
     )
     factory_t = PopulationFactory(cfg_t, lon, lat)
     for stagger, tag in [(False, "synchronized starts"), (True, "staggered starts")]:

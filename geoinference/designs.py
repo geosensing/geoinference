@@ -1,5 +1,4 @@
-"""
-Design specifications for geoinference.
+"""Design specifications for geoinference.
 
 A design object encodes how the data was collected — the sampling
 mechanism, the clustering structure, the weighting scheme — so that
@@ -43,6 +42,11 @@ class PointDesign:
 
     @property
     def name(self) -> str:
+        """Return a slug naming the sampling scheme and what it carries.
+
+        Returns:
+            e.g. ``"point_srs_clustered"``.
+        """
         parts = [f"point_{self.sampling}"]
         if self.cluster_var:
             parts.append("clustered")
@@ -52,10 +56,20 @@ class PointDesign:
 
     @property
     def has_clusters(self) -> bool:
+        """Report whether observations are grouped into clusters.
+
+        Returns:
+            True when a cluster column was given.
+        """
         return self.cluster_var is not None
 
     @property
     def has_weights(self) -> bool:
+        """Report whether observations carry design weights.
+
+        Returns:
+            True when a weight column was given.
+        """
         return self.weight_var is not None
 
     @property
@@ -77,12 +91,20 @@ class PointDesign:
         return "naive"
 
     def __post_init__(self) -> None:
+        """Reject designs that cannot be estimated as specified.
+
+        Raises:
+            ValueError: If PPS/GRTS is chosen without weights, or
+                ``annotation_frac`` falls outside (0, 1].
+        """
         if self.sampling in ("pps", "grts") and self.weight_var is None:
             raise ValueError(
                 f"Design '{self.sampling}' requires weight_var "
                 f"(inclusion probabilities or design weights)."
             )
-        if isinstance(self.annotation_frac, (int, float)) and not (0 < self.annotation_frac <= 1.0):
+        if isinstance(self.annotation_frac, (int, float)) and not (
+            0 < self.annotation_frac <= 1.0
+        ):
             raise ValueError("annotation_frac must be in (0, 1].")
 
 
@@ -108,19 +130,39 @@ class WalkDesign:
 
     @property
     def name(self) -> str:
+        """Return the design slug.
+
+        Returns:
+            Always ``"walk_transect"``.
+        """
         return "walk_transect"
 
     @property
     def has_clusters(self) -> bool:
-        return True  # walks are always the clustering unit
+        """Report whether observations are grouped into clusters.
+
+        Returns:
+            Always True: the walk is the clustering unit.
+        """
+        return True
 
     @property
     def cluster_var(self) -> str:
+        """Return the column that identifies a cluster.
+
+        Returns:
+            The walk column, since walks are the clusters.
+        """
         return self.walk_var
 
     @property
     def has_weights(self) -> bool:
-        return False  # self-weighting by construction
+        """Report whether observations carry design weights.
+
+        Returns:
+            Always False: a walk transect is self-weighting by construction.
+        """
+        return False
 
     @property
     def recommended_se_method(self) -> str:
@@ -128,6 +170,11 @@ class WalkDesign:
         return "cluster"
 
     def __post_init__(self) -> None:
+        """Reject a non-positive annotation spacing.
+
+        Raises:
+            ValueError: If ``spacing_m`` is given and not positive.
+        """
         if self.spacing_m is not None and self.spacing_m <= 0:
             raise ValueError("spacing_m must be positive.")
 

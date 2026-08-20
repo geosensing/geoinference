@@ -1,5 +1,4 @@
-"""
-Space-time Monte Carlo harness for stress-testing itinerary-based collection.
+"""Space-time Monte Carlo harness for stress-testing itinerary-based collection.
 
 The point of this module is *limiting-case reasoning*. We simulate a known
 space-time data-generating process (DGP) with no measurement noise, run real
@@ -234,8 +233,7 @@ class Pipeline:
 def _systematic_order(pop: Population) -> np.ndarray:
     """A boustrophedon ("snake") ordering of grid points for even coverage."""
     # Rank by lat band, alternating lon direction per band — works for the grid.
-    order = np.lexsort((pop.lon, pop.lat))
-    return order
+    return np.lexsort((pop.lon, pop.lat))
 
 
 def _route(
@@ -280,7 +278,9 @@ def _route(
             nxt = int(cand[np.argmin(pop.dist_m[cur, cand])])
         elif pipe.routing == "dispersed":
             if visited:
-                dmin = pop.dist_m[np.ix_(cand, np.array(visited, dtype=int))].min(axis=1)
+                dmin = pop.dist_m[np.ix_(cand, np.array(visited, dtype=int))].min(
+                    axis=1
+                )
                 nxt = int(cand[np.argmax(dmin)])
             else:
                 nxt = int(cand[np.argmax(pop.dist_m[cur, cand])])
@@ -415,7 +415,7 @@ def _method_ci(
             seed=boot_seed,
         )
     if se_method == "boot":
-        se = res.ratio_se.bootstrap if res.ratio_se.bootstrap else float("nan")
+        se = res.ratio_se.bootstrap or float("nan")
         ci = res.ratio_ci.bootstrap
         lo, hi = ci if ci is not None else (float("nan"), float("nan"))
         return se, lo, hi
@@ -427,7 +427,9 @@ def _method_ci(
     else:
         se = res.ratio_se.recommended
 
-    use_cluster = se_method == "cluster" or (se_method == "auto" and recommended == "cluster")
+    use_cluster = se_method == "cluster" or (
+        se_method == "auto" and recommended == "cluster"
+    )
     if use_cluster and res.n_clusters >= 2:
         crit = float(-sp_stats.t.ppf((1 - ci_level) / 2, df=res.n_clusters - 1))
     else:
@@ -533,7 +535,9 @@ def run_pipeline(
             neff.append(res.diagnostics.n_eff_space)
             wb.append(res.diagnostics.within_between_ratio)
 
-    return _aggregate(pipe.name, se_method, diffs, ses, covers, ns, dists, neff, wb, valid)
+    return _aggregate(
+        pipe.name, se_method, diffs, ses, covers, ns, dists, neff, wb, valid
+    )
 
 
 def evaluate_scene(
@@ -568,7 +572,9 @@ def evaluate_scene(
         timestamp_s: Per-frame absolute timestamp in seconds across the whole
             operation — fed to ``estimate`` as ``time_var``.
         cfg: Simulation configuration (DGP + Monte Carlo).
-        se_method, ci_level, spatial_diag: As in ``run_pipeline``.
+        se_method: SE estimator to use, or "auto" to take the design's.
+        ci_level: Coverage the interval claims.
+        spatial_diag: Whether to accumulate the spatial dependence diagnostics.
         label: Names the RNG stream / result row.
 
     Returns:
@@ -629,7 +635,9 @@ def evaluate_scene(
             neff.append(res.diagnostics.n_eff_space)
             wb.append(res.diagnostics.within_between_ratio)
 
-    return _aggregate(label, se_method, diffs, ses, covers, [float(m)], [], neff, wb, valid)
+    return _aggregate(
+        label, se_method, diffs, ses, covers, [float(m)], [], neff, wb, valid
+    )
 
 
 def run_experiment(
@@ -641,7 +649,10 @@ def run_experiment(
 ) -> list[PipelineResult]:
     """Run every pipeline against one shared population factory (one DGP)."""
     factory = PopulationFactory(cfg)
-    return [run_pipeline(factory, p, cfg, se_method, ci_level, spatial_diag) for p in pipelines]
+    return [
+        run_pipeline(factory, p, cfg, se_method, ci_level, spatial_diag)
+        for p in pipelines
+    ]
 
 
 def results_table(results: list[PipelineResult]) -> str:
@@ -653,8 +664,7 @@ def results_table(results: list[PipelineResult]) -> str:
     widths = {c: max(len(c), *(len(str(r[c])) for r in rows)) for c in cols}
     head = "  ".join(c.rjust(widths[c]) for c in cols)
     lines = [head, "-" * len(head)]
-    for r in rows:
-        lines.append("  ".join(str(r[c]).rjust(widths[c]) for c in cols))
+    lines.extend("  ".join(str(r[c]).rjust(widths[c]) for c in cols) for r in rows)
     return "\n".join(lines)
 
 
@@ -678,22 +688,32 @@ def main() -> None:
     warnings.simplefilter("ignore")
 
     print("\n[1] Spatial extremes (no time effect): corr=0 vs corr->inf")
-    for label, rs in [("corr = 0  (white noise)", 0.0), ("corr -> inf (constant)", 1e7)]:
+    for label, rs in [
+        ("corr = 0  (white noise)", 0.0),
+        ("corr -> inf (constant)", 1e7),
+    ]:
         cfg = SimConfig(range_s_m=rs, diurnal_amp=0.0, sd_t=0.0, n_sims=150, grid_n=16)
         print(f"\n  {label}:")
-        print(results_table(run_experiment(cfg, default_pipelines(), spatial_diag=True)))
+        print(
+            results_table(run_experiment(cfg, default_pipelines(), spatial_diag=True))
+        )
 
     print("\n[2] SE coverage vs spatial correlation (compact routing, K=8)")
     compact = Pipeline("compact", routing="compact")
     print(f"  {'range_s':>8} | {'naive':>6} | {'cluster-t':>9} | {'wcb':>6}")
     for rs in [0, 800, 2000, 6000]:
-        cfg = SimConfig(range_s_m=float(rs), diurnal_amp=0.0, sd_t=0.0, n_sims=200, grid_n=16)
+        cfg = SimConfig(
+            range_s_m=float(rs), diurnal_amp=0.0, sd_t=0.0, n_sims=200, grid_n=16
+        )
         fac = PopulationFactory(cfg)
         cov = {
             m: run_pipeline(fac, compact, cfg, se_method=m).coverage
             for m in ("naive", "cluster", "wcb")
         }
-        print(f"  {rs:>8} | {cov['naive']:>6.2f} | {cov['cluster']:>9.2f} | {cov['wcb']:>6.2f}")
+        print(
+            f"  {rs:>8} | {cov['naive']:>6.2f} | "
+            f"{cov['cluster']:>9.2f} | {cov['wcb']:>6.2f}"
+        )
 
     print("\n[3] Temporal bias (strong diurnal): synchronized vs staggered start times")
     cfg = SimConfig(range_s_m=600.0, diurnal_amp=1.5, sd_t=0.0, n_sims=150, grid_n=16)

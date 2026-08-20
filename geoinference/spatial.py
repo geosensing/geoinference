@@ -1,5 +1,4 @@
-"""
-Spatial and temporal dependence diagnostics for geoinference.
+"""Spatial and temporal dependence diagnostics for geoinference.
 
 These functions measure how much within-itinerary correlation there is and
 how fast it decays along an axis — geographic distance, time gap, or any
@@ -169,6 +168,9 @@ def fit_variogram(
 
     Returns:
         (nugget C0, sill C1, range r). NaNs if the fit cannot be performed.
+
+    Raises:
+        ValueError: If ``model`` names anything but ``"exponential"``.
     """
     if model != "exponential":
         raise ValueError(f"Unsupported variogram model: {model!r}")
@@ -274,11 +276,24 @@ def effective_n(
     correlation ``rho(d) = ((sill - nugget)/sill) * exp(-d/range_)`` (Griffith
     2005; Watson 2021). Reduces to ``n`` when there is no autocorrelation.
 
+    Args:
+        values: The observations, used only for their count.
+        dist: Condensed pairwise distance matrix over those observations.
+        nugget: Variogram nugget C0.
+        sill: Variogram sill C1.
+        range_: Variogram e-folding range r.
+
     Returns:
         Effective sample size (<= n), or n if the fit was degenerate.
     """
     n = len(values)
-    if n < 2 or not np.isfinite(sill) or sill <= 0 or not np.isfinite(range_) or range_ <= 0:
+    if (
+        n < 2
+        or not np.isfinite(sill)
+        or sill <= 0
+        or not np.isfinite(range_)
+        or range_ <= 0
+    ):
         return float(n)
 
     corr_ratio = (sill - nugget) / sill
@@ -301,6 +316,10 @@ def within_between_contrast(values: np.ndarray, labels: np.ndarray) -> dict[str,
     itineraries look like representative subsamples (dispersed); ``ratio``
     well below 1 means within-itinerary pairs are much more alike (compact
     routes), which inflates the design effect.
+
+    Args:
+        values: One value per observation.
+        labels: Cluster label per observation, aligned to ``values``.
 
     Returns:
         ``{"within", "between", "ratio"}`` (semivariances; NaN where undefined).
